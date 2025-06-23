@@ -5,7 +5,7 @@ def get_file_content(working_directory, file_path):
     joined_path = os.path.join(working_directory, file_path)
     abspath_joined = os.path.abspath(joined_path)
     
-    #use absolute paths and .startswith() to determine if file_path resides in workking_directory
+    #determine if file_path resides in workking_directory
     if not abspath_joined.startswith(abspath_wd):
         return f'Error: Cannot read "{file_path}" as it is outside the permitted working directory'
     
