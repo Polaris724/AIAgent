@@ -15,16 +15,32 @@ def run_python_file(working_directory, file_path):
     if not os.path.isfile(abspath_joined):
         return f'Error: File "{file_path}" not found.'
     
-#check if file is a python file (ends in .py)
+#check if file is a python file
     if not file_path.endswith(".py"):
         return f'Error: "{file_path}" is not a Python file.'
     
-#use subprocess.run to run the file
-    subprocess.run(file_path, timeout=30) #needs more work
-#create a timeout of 30secs when running file
-#capture both stdout and stderr
-#set the working directory properly
-#output stdout and stderr
-#if exit code != 0, return exited with code X
-#if no output produced, return "No output produced."
 #catch and handle errors
+    try:
+        output = []
+
+        #use subprocess.run to run the file
+        result = subprocess.run(["python3", abspath_joined], timeout=30, capture_output=True, cwd=abspath_wd)
+
+        #output stdout and stderr
+        stderr_output = result.stderr.decode("utf-8")
+        stdout_output = result.stdout.decode("utf-8")
+        output.append(f"STDOUT: {stdout_output}")
+        output.append(f"STDERR: {stderr_output}")
+
+        #if exit code != 0, return exited with code X
+        exit_code = result.returncode
+        if exit_code != 0:
+            output.append(f"Process exited with code {exit_code}.")
+
+        #if no output produced, return "No output produced."
+        if result == None:
+            return f"No output produced."
+        else:
+            return "\n".join(output)
+    except Exception as e:
+        return f"Error: executing Python file: {str(e)}"
