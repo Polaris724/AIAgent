@@ -30,6 +30,9 @@ You are a helpful AI coding agent.
 When a user asks a question or makes a request, make a function call plan. You can perform the following operations:
 
 - List files and directories
+- Read file contents
+- Execute Python files with optional arguments
+- Write or overwrite files
 
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 """
@@ -48,11 +51,59 @@ schema_get_files_info = types.FunctionDeclaration(
         },
     ),
 )
+schema_get_file_content = types.FunctionDeclaration(
+    name="get_file_content",
+    description="Returns content of the specified file through the file path, constrained and relative to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The file path of the file to get the content from, relative to the working directory."
+            )
+        }
+    )
+)
+
+schema_write_file = types.FunctionDeclaration(
+    name="write_file",
+    description="Overwrites a specified file's content with the new specified content, constrained to the working directory. If no file or path to the file exists, directories and file will be created and specified content added.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The file path of the file to get the content from, relative to the working directory."
+            ),
+            "content": types.Schema(
+                type=types.Type.STRING,
+                description="The content to overwrite the specified file with, or to add to the newly created file."
+            )
+        }
+    )
+)
+
+schema_run_python = types.FunctionDeclaration(
+    name="run_python_file",
+    description="Runs the specified python file (.py), constrained to the working directory.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The file path of the file to get the content from, relative to the working directory."
+            )
+        }
+    )
+)
 
 #list of available functions
 available_functions = types.Tool(
     function_declarations=[
         schema_get_files_info,
+        schema_get_file_content,
+        schema_write_file,
+        schema_run_python
     ]
 )
 
@@ -65,13 +116,33 @@ response = client.models.generate_content(
         system_instruction=system_prompt
         )
 )
+from functions.get_file_content import get_file_content
+from functions.get_files_info import get_files_info
+from functions.write_file import write_file
+from functions.run_python import run_python_file
+
+working_directory = os.path.dirname(os.path.abspath(__file__))
+
+function_map = {
+    "get_file_content": get_file_content,
+    "get_files_info": get_files_info,
+    "write_file": write_file,
+    "run_python_file": run_python_file
+}
+
+if response.function_calls:
+    #for func in response.function_calls:
+    fn_name = response.function_calls[0].name           # String, e.g., "get_file_content"
+    args = response.function_calls[0].args               # Dictionary, e.g., {"file_path": "main.py"}
+    fn = function_map[fn_name]                           # The real function object
+    result = fn(working_directory, **args)                                  # Call function with unpacked arguments
 
 if verbose:
     print(f"User prompt: {user_prompt}")
 print(response.text)
 if response.function_calls:
+    print(f"{result}")
     print(f"Calling function: {response.function_calls[0].name}({response.function_calls[0].args})")
 if verbose:
     print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
     print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
-
