@@ -107,15 +107,6 @@ available_functions = types.Tool(
     ]
 )
 
-#response generator
-response = client.models.generate_content(
-    model="gemini-2.0-flash-001", 
-    contents=messages,
-    config=types.GenerateContentConfig(
-        tools=[available_functions],
-        system_instruction=system_prompt
-        )
-)
 from functions.get_file_content import get_file_content
 from functions.get_files_info import get_files_info
 from functions.write_file import write_file
@@ -130,19 +121,43 @@ function_map = {
     "run_python_file": run_python_file
 }
 
-if response.function_calls:
-    #for func in response.function_calls:
-    fn_name = response.function_calls[0].name           # String, e.g., "get_file_content"
-    args = response.function_calls[0].args               # Dictionary, e.g., {"file_path": "main.py"}
-    fn = function_map[fn_name]                           # The real function object
-    result = fn(working_directory, **args)                                  # Call function with unpacked arguments
+#response generator
+for i in range(20):
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-001", 
+            contents=messages,
+            config=types.GenerateContentConfig(
+                tools=[available_functions],
+                system_instruction=system_prompt
+            )
+        )
+        for candidate in response.candidates:
+            messages.append(candidate.content)
 
-if verbose:
-    print(f"User prompt: {user_prompt}")
-print(response.text)
-if response.function_calls:
-    print(f"{result}")
-    print(f"Calling function: {response.function_calls[0].name}({response.function_calls[0].args})")
-if verbose:
-    print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-    print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+        if response.function_calls:
+            for function in response.function_calls:
+                fn_name = function.name
+                args = function.args
+                fn = function_map[fn_name]
+                result = fn(working_directory, **args)
+                messages.append(types.Content(
+                    parts=[types.Part(text=str(result))],
+                    role='model'
+                    )
+                )
+                print(f" - Calling function: {function.name}({function.args})")
+        else:
+            if response.text:
+                if verbose:
+                    print(f"User prompt: {user_prompt}")
+                print(f"Final result: \n{response.text}")
+                if verbose:
+                    print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+                    print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+            
+            break
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        pass
